@@ -45,7 +45,9 @@ The system is designed as a **foundation** for interactive agents, virtual assis
 ├─ audio.py       # Text-to-speech pipeline (Piper)
 
 ├─ config.py      # Configuration, paths, and model settings
+
 ├─ vtuber_brain.py# Original single-file prototype (reference)
+
 ├─ requirements.txt
 
 └─ README.md
