@@ -22,3 +22,20 @@ OUT_WAV = PIPER_DIR / "out.wav"
 
 # TTS tuning (optional): 1.0 = normal, >1.0 slower, <1.0 faster
 LENGTH_SCALE = "1.2"
+
+# ---------------------------
+# LOGGING & IDLE TALK SETTINGS
+# ---------------------------
+LOG_DIR = Path("logs")
+CONVERSATION_LOG = LOG_DIR / "conversation.log"
+ERROR_LOG = LOG_DIR / "error.log"
+
+# Autonomous self-talk master switch
+AUTONOMOUS_MODE_ENABLED = True
+
+# Seconds before VTuber starts talking when no user input (10–20 sec recommended)
+IDLE_USER_TIMEOUT = 15
+# Minimum seconds between automatic talks
+IDLE_MIN_INTERVAL = 60
+# Maximum number of automatic talks per session
+IDLE_MAX_MESSAGES = 10

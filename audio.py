@@ -25,14 +25,19 @@ def speak_piper(text: str) -> None:
     ]
 
     # Silence Piper logs (optional). Remove stdout/stderr if you want logs.
-    subprocess.run(
-        cmd,
-        input=text + "\n",
-        text=True,
-        check=True,
-        cwd=str(PIPER_DIR),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    try:
+        subprocess.run(
+            cmd,
+            input=text + "\n",
+            text=True,
+            check=True,
+            cwd=str(PIPER_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        # Do not crash the whole VTuber if TTS fails; just warn and skip.
+        print(f"[WARN] Piper TTS failed: {e}")
+        return
 
     winsound.PlaySound(str(OUT_WAV), winsound.SND_FILENAME)
