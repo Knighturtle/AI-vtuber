@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+out.wav
+.env
+.DS_Store
+.vscode/
