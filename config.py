@@ -39,3 +39,5 @@ IDLE_USER_TIMEOUT = 15
 IDLE_MIN_INTERVAL = 60
 # Maximum number of automatic talks per session
 IDLE_MAX_MESSAGES = 10
+VNYAN_OSC_IP = "127.0.0.1"
+VNYAN_OSC_PORT = 9000
