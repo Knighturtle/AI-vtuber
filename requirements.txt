@@ -1,1 +1,4 @@
 ollama
+python-osc
+pyttsx3
+sounddevice

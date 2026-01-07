@@ -1,73 +1,67 @@
-# AI VTuber (Streaming LLM + Real-time TTS)
+# AI-Vtuber "Full Start" Guide
 
-A Python-based AI VTuber prototype that integrates **streaming large language model (LLM) responses** with **real-time text-to-speech (TTS)** output.  
-This project focuses on **modular architecture**, **low-latency interaction**, and **extensibility** toward autonomous and long-running operation.
+This repository contains a simple AI VTuber system that connects Ollama (Brain), Piper (TTS), and VSeeFace (Avatar/Emotions).
 
----
+## Prerequisites
+- **Windows OS**
+- **Python 3.10+**
+- **Ollama** installed and running (Model: `gemma3:4b` or change in `config.py`)
+- **Piper TTS** configured (paths in `config.py`)
+- **VSeeFace** installed
 
-## Overview
+## Setup Instructions
 
-This project demonstrates how a conversational AI system can:
+### 1. VSeeFace Configuration
+1. Open VSeeFace.
+2. Go to **Settings > General**.
+3. Enable **OSC Receiver** (if applicable, but mainly we use VRChat format).
+4. Go to **Settings > Advanced**.
+5. Enable **"Send VRChat OSC data (experimental)"** (Actually we are *sending* TO VSeeFace, so ensure **"Listen for VRChat OSC data"** is ON).
+   - Receiver Port: **39539** (Default)
+   - *Note: VSeeFace listens on 39539 by default for VRChat-params.*
+6. Ensure your avatar has BlendShapes named:
+   - `Joy`
+   - `Angry`
+   - `Sad`
+   - `Surprised`
+   - *If your avatar uses different names (e.g. `Fun`, `Sorrow`), update `EMOTION_PARAMS` in `config.py`.*
 
-- Generate **token-streamed responses** from a local LLM
-- Convert responses into **real-time speech output**
-- Maintain short-term conversational memory
-- Separate concerns cleanly across modules for future scalability
+### 2. Python Environment
+Open PowerShell in this folder:
 
-The system is designed as a **foundation** for interactive agents, virtual assistants, or VTuber-style applications.
+```powershell
+# Create venv (if not exists)
+python -m venv .venv
 
----
+# Activate venv
+.\.venv\Scripts\Activate.ps1
 
-## Key Features
-
-- **Streaming text generation**
-  - Incremental token output from a local LLM (via Ollama)
-- **Real-time voice synthesis**
-  - Sentence-by-sentence speech playback using Piper TTS
-- **Low-latency interaction**
-  - Text is printed and spoken while the model is still generating
-- **Simple conversation memory**
-  - Short rolling chat history for contextual responses
-- **Command-like input detection**
-  - Prevents accidental shell commands from being treated as chat input
-- **Modular architecture**
-  - Clear separation of I/O, reasoning, audio, and configuration layers
-- **Designed for future autonomy**
-  - Structure supports expansion toward 24/7 or self-driven operation
-
----
-
-## Project Structure
-├─ main.py        # Application entry point and main I/O loop
-
-├─ brain.py       # LLM interaction, streaming logic, and memory
-
-├─ audio.py       # Text-to-speech pipeline (Piper)
-
-├─ config.py      # Configuration, paths, and model settings
-
-├─ vtuber_brain.py# Original single-file prototype (reference)
-
-├─ requirements.txt
-
-└─ README.md
-
-Requirements / Installation / Running
-## Requirements
-- OS: Windows
-- Python 3.10+
-- Local LLM backend (Ollama)
-- Local TTS engine (Piper)
-
-## Installation
+# Install dependencies
 pip install -r requirements.txt
+```
 
-## Running
+### 3. Test Expressions
+Check if the avatar's face moves:
+
+```powershell
+python test_expression.py
+```
+*You should see the avatar cycle through Joy, Angry, Sad, Surprised.*
+*If it doesn't move:*
+- Check VSeeFace port (39539).
+- Check IP (127.0.0.1).
+- Check BlendShape names in VSeeFace vs `config.py`.
+
+### 4. Run the VTuber
+```powershell
 python main.py
+```
+- Type in the console to talk to the VTuber.
+- The VTuber will reply (Ollama), speak (Piper), and change expression (OSC).
+- Use `Ctrl+C` or type `exit` to quit.
 
-## License
-
-This project is licensed under the MIT License.
-See the LICENSE file for details.
-
+## Troubleshooting
+- **No Audio**: Check `PIPER_DIR` path in `config.py`.
+- **No Emotions**: Run `test_expression.py`. If fails, disable firewall or check VSeeFace OSC settings.
+- **Ollama Error**: Ensure `ollama serve` is running and you have pulled the model (`ollama pull gemma3:4b`).
 
