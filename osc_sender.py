@@ -1,17 +1,19 @@
-from pythonosc import udp_client
-import time
+# osc_sender.py
+from pythonosc.udp_client import SimpleUDPClient
 
-# VNyAN の OSC 設定に合わせる
-VNYAN_IP = "127.0.0.1"
-VNYAN_PORT = 28569
+VSEE_IP = "127.0.0.1"
+VSEE_PORT = 39539  # ← VSeeFaceのVMC receiverのポートと同じにする
 
-client = udp_client.SimpleUDPClient(VNYAN_IP, VNYAN_PORT)
+client = SimpleUDPClient(VSEE_IP, VSEE_PORT)
 
-print("OSC send test start")
+def send_expression(name: str, value: float):
+    # VMC: Blendshape value
+    client.send_message("/VMC/Ext/Blend/Val", [name, float(value)])
+    # これが無いと反映されない環境があるので「Apply」も投げる
+    client.send_message("/VMC/Ext/Blend/Apply", 1)
 
-while True:
-    # 頭を左右に振るテスト
-    client.send_message("/avatar/parameters/HeadYaw", 0.5)
-    time.sleep(1)
-    client.send_message("/avatar/parameters/HeadYaw", -0.5)
-    time.sleep(1)
+def clear_all():
+    # よく使うプリセットを0に戻す（必要なら増やしてOK）
+    for k in ["Neutral", "Joy", "Angry", "Sorrow", "Fun", "Surprise"]:
+        client.send_message("/VMC/Ext/Blend/Val", [k, 0.0])
+    client.send_message("/VMC/Ext/Blend/Apply", 1)

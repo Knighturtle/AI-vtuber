@@ -1,43 +1,57 @@
-import subprocess
-import winsound
+import traceback
+import pyttsx3
+import time
 
-from config import PIPER_EXE, MODEL, CONFIG, ESPEAK_DATA, OUT_WAV, LENGTH_SCALE, PIPER_DIR
+def _pick_jp_voice(eng):
+    try:
+        voices = eng.getProperty("voices") or []
+        for v in voices:
+            name = (getattr(v, "name", "") or "")
+            vid  = (getattr(v, "id", "") or "")
+            if ("Haruka" in name) or ("JA-JP" in vid) or ("ja-JP" in vid):
+                eng.setProperty("voice", v.id)
+                print(f"[AUDIO] using voice: {name}")
+                return
+        if voices:
+            # Fallback
+            default_name = getattr(voices[0], "name", "Default")
+            print(f"[AUDIO] using default voice: {default_name}")
+    except Exception as e:
+        print("[AUDIO][WARN] voice select failed:", e)
 
-
-def ascii_only(text: str) -> str:
-    """Remove any non-ASCII chars (prevents cp1252 UnicodeEncodeError)."""
-    return text.encode("ascii", errors="ignore").decode()
-
-
-def speak_piper(text: str) -> None:
-    """Speak one chunk using Piper. ASCII-only to avoid Windows console encoding issues."""
-    text = ascii_only(text.strip())
+def speak_jp(text: str):
+    """
+    Speak text using a fresh pyttsx3 engine instance every time.
+    This prevents audio driver freeze issues on some Windows environments.
+    """
+    text = str(text or "").strip()
     if not text:
         return
-
-    cmd = [
-        str(PIPER_EXE),
-        "--model", str(MODEL),
-        "--config", str(CONFIG),
-        "--espeak_data", str(ESPEAK_DATA),
-        "--output_file", str(OUT_WAV),
-        "--length_scale", str(LENGTH_SCALE),
-    ]
-
-    # Silence Piper logs (optional). Remove stdout/stderr if you want logs.
+    
+    eng = None
     try:
-        subprocess.run(
-            cmd,
-            input=text + "\n",
-            text=True,
-            check=True,
-            cwd=str(PIPER_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # Explicitly use sapi5 on Windows
+        eng = pyttsx3.init(driverName="sapi5")
+        eng.setProperty("rate", 170)
+        eng.setProperty("volume", 1.0)
+        
+        _pick_jp_voice(eng)
+        
+        # print(f"[AUDIO] saying: {text[:20]}...")
+        eng.say(text)
+        eng.runAndWait()
+        
     except Exception as e:
-        # Do not crash the whole VTuber if TTS fails; just warn and skip.
-        print(f"[WARN] Piper TTS failed: {e}")
-        return
+        print(f"[AUDIO][ERROR] speak failed: {e}")
+        traceback.print_exc()
+    finally:
+        if eng:
+            try:
+                eng.stop()
+                # Deliberately remove reference to aid GC
+                del eng
+            except Exception:
+                pass
 
-    winsound.PlaySound(str(OUT_WAV), winsound.SND_FILENAME)
+# Alias for compatibility
+speak = speak_jp

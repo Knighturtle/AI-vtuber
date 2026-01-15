@@ -1,4 +1,4 @@
-ollama
 python-osc
+requests
 pyttsx3
-sounddevice
+ollama

@@ -1,103 +1,98 @@
 import re
-
 from ollama import chat
+from config import SYSTEM_PROMPT, OLLAMA_MODEL, EMOTION_PARAMS
 
-from audio import speak_piper, ascii_only
-from config import SYSTEM_PROMPT, OLLAMA_MODEL
+def normalize_emotion(raw_emo: str) -> str:
+    """Normalize emotion string to one of the allowed params or Neutral."""
+    raw = raw_emo.strip().lower()
+    valid_map = {e.lower(): e for e in EMOTION_PARAMS}
+    
+    if raw in valid_map:
+        return valid_map[raw]
+    return "Neutral"
 
-
-# ---------------------------
-# HELPERS
-# ---------------------------
-SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
-
-
-def is_probably_shell_command(s: str) -> bool:
-    """Very simple detection to stop accidental commands being treated as chat."""
-    s = s.strip()
-    if not s:
-        return False
-    starters = ("cd ", "dir", "ls", "python", "pip", "ollama", "chcp", "git", "cls", "start ", "code ")
-    if s.lower().startswith(starters):
-        return True
-    if s.startswith((".", "..", ".\\", "C:\\", "D:\\")):
-        return True
-    return False
-
-
-# ---------------------------
-# OLLAMA STREAMING
-# ---------------------------
-CHAT_MEMORY = []  # list of {"role": "user"/"assistant", "content": "..."}
-MEMORY_LIMIT = 10
-
-
-def add_memory(role: str, text: str) -> None:
-    """Keep last N user/assistant messages."""
-    global CHAT_MEMORY
-    text = ascii_only(text.strip())
-    if not text:
-        return
-    CHAT_MEMORY.append({"role": role, "content": text})
-    if len(CHAT_MEMORY) > MEMORY_LIMIT:
-        CHAT_MEMORY.pop(0)
-
-
-def talk_stream(user_text: str):
-    """Yield streamed tokens from Ollama (already ASCII-only)."""
-    user_text = ascii_only(user_text)
-
-    messages = (
-        [{"role": "system", "content": SYSTEM_PROMPT}]
-        + CHAT_MEMORY
-        + [{"role": "user", "content": user_text}]
-    )
-
-    stream = chat(
-        model=OLLAMA_MODEL,
-        messages=messages,
-        stream=True,
-    )
-
-    for part in stream:
-        chunk = part.get("message", {}).get("content", "")
-        chunk = ascii_only(chunk)
-        if chunk:
-            yield chunk
-
-
-def stream_speak(token_iter) -> str:
+def get_reply_and_emotion(user_text: str):
     """
-    Print streaming text immediately, and speak sentence-by-sentence.
-    Returns full final assistant reply (ASCII-only).
+    Send text to Ollama and robustly parse response.
+    Returns: (reply_text, emotion_label)
     """
-    buf = ""
-    full = ""
-    spoken_any = False
+    
+    # 1. Angry Override Check (Pre-LLM or Post-LLM? User implies override result)
+    # We will check this at the end to overwrite LLM's emotion if needed.
+    angry_keywords = ["ふざけるな", "ムカつく", "怒る", "舐めるな", "馬鹿"]
+    is_angry_input = any(k in user_text for k in angry_keywords)
 
-    for token in token_iter:
-        print(token, end="", flush=True)
-        full += token
-        buf += token
+    # 2. Strict Prompt
+    prompt = f"""
+User says: "{user_text}"
 
-        parts = SENT_SPLIT.split(buf)
-        # Speak all complete sentences; keep the last partial in buf
-        for sent in parts[:-1]:
-            sent = sent.strip()
-            if sent:
-                speak_piper(sent)
-                spoken_any = True
+Instructions:
+1. Decide emotion from: {', '.join(EMOTION_PARAMS)}
+2. Write a short Japanese reply.
+3. ABSOLUTELY NO MARKDOWN. NO **bold**. NO QUOTES.
+4. Output format must be EXACTLY two lines:
+EMOTION: <Emotion>
+REPLY: <Reply text>
+"""
 
-        buf = parts[-1] if parts else ""
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt}
+    ]
 
-        # prevent buffer from growing too large
-        if spoken_any and len(buf) > 500:
-            buf = buf[-500:]
+    try:
+        response = chat(model=OLLAMA_MODEL, messages=messages)
+        content = response['message']['content'].strip()
+        
+        # Requirement 3: Raw Log
+        print(f"[LLM RAW] {content}")
 
-    # Speak leftover tail
-    tail = buf.strip()
-    if tail:
-        speak_piper(tail)
+        # Requirement 2: Robust Parsing
+        emotion = "Neutral"
+        reply = content 
 
-    print()  # newline after reply
-    return full.strip()
+        # Find EMOTION (Case insensitive, lenient separator)
+        # Matches: "EMOTION: Joy", "EMOTION=Joy", "**EMOTION**: Joy", "Emotion Joy"
+        emo_match = re.search(r"(?:EMOTION|Emotion)[\s:=]+([a-zA-Z]+)", content)
+        if emo_match:
+            emotion = normalize_emotion(emo_match.group(1))
+        
+        # Find REPLY
+        # Look for "REPLY:" etc, and take everything after.
+        reply_match = re.search(r"(?:REPLY|Reply)[\s:=]+(.*)", content, re.DOTALL)
+        if reply_match:
+            reply = reply_match.group(1).strip()
+            
+            # Inner cleanup if potential double prefix
+            inner_match = re.match(r"^(?:REPLY|Reply)[\s:=「]+", reply, re.IGNORECASE)
+            if inner_match:
+                reply = reply[inner_match.end():].strip()
+        else:
+            # Fallback: remove emotion line from content
+            lines = content.split('\n')
+            clean_lines = []
+            for line in lines:
+                # If line looks like EMOTION header, skip
+                if re.match(r"^\s*(?:EMOTION|Emotion)[\s:=]+", line):
+                    continue
+                # If line is just empty or symbols
+                if not line.strip():
+                    continue
+                clean_lines.append(line)
+            if clean_lines:
+                reply = "\n".join(clean_lines).strip()
+
+        # Final Cleanup of Reply
+        reply = reply.strip('"\'')
+        reply = re.sub(r"^(?:REPLY|Reply)[\s:=]+", "", reply, flags=re.IGNORECASE).strip()
+
+        # 4. Apply Angry Override
+        if is_angry_input:
+            print("[LOGIC] Angry keyword detected -> Forcing Angry")
+            emotion = "Angry"
+
+        return reply, emotion
+
+    except Exception as e:
+        print(f"[ERROR] Ollama failed: {e}")
+        return "エラーが発生しました。", "Sorrow"
